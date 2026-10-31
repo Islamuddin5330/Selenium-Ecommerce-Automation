@@ -1,6 +1,7 @@
 
 package com.commerce.utilities;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -27,8 +28,16 @@ public class ExcelData4 {
     public Object[][] getExcelData(String sheetName)
             throws IOException {
 
-        filePath = System.getProperty("user.dir")
-                + "\\src\\test\\resources\\ExcelFile\\ExcelData.xlsx";
+    	String configPath = System.getProperty("user.dir")
+    	        + File.separator + "src"
+    	        + File.separator + "test"
+    	        + File.separator + "resources"
+    	        + File.separator + "ExcelFile"
+    	        + File.separator + "ExcelData.xlsx";
+    	filePath = configPath;
+    	
+//        filePath = System.getProperty("user.dir")
+//                + "\\src\\test\\resources\\ExcelFile\\ExcelData.xlsx";
 
         FileInputStream fis = new FileInputStream(filePath);
 

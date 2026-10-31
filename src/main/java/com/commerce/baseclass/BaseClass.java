@@ -1,9 +1,12 @@
 package com.commerce.baseclass;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Properties;
+
+import org.openqa.selenium.chrome.ChromeOptions;
 
 import org.apache.logging.log4j.Logger;
 import org.openqa.selenium.WebDriver;
@@ -27,7 +30,12 @@ public class BaseClass {
 	public void setUp() throws IOException {
 		logger.info("========== Test Execution Started ==========");
 		pro = new Properties();
-		FileInputStream fis = new FileInputStream(System.getProperty("user.dir")+"\\src\\main\\resources\\config.properties");
+		String configPath = System.getProperty("user.dir")
+		        + File.separator + "src"
+		        + File.separator + "main"
+		        + File.separator + "resources"
+		        + File.separator + "config.properties";
+		FileInputStream fis = new FileInputStream(configPath);
 		pro.load(fis);
 		
 		String browser = pro.getProperty("browser");
@@ -36,8 +44,24 @@ public class BaseClass {
 		logger.info("Browser selected: " + browser);
 		
 		if(browser.equalsIgnoreCase("Chrome")) {
-			driver.set(new ChromeDriver());
-			logger.info("Chrome browser launched successfully");
+
+		    ChromeOptions options = new ChromeOptions();
+
+		    boolean headless = Boolean.parseBoolean(
+		            System.getProperty("headless", "false"));
+
+		    if(headless) {
+		        options.addArguments("--headless=new");
+		        options.addArguments("--no-sandbox");
+		        options.addArguments("--disable-dev-shm-usage");
+		        options.addArguments("--window-size=1920,1080");
+
+		        logger.info("Chrome launched in headless mode");
+		    }
+
+		    driver.set(new ChromeDriver(options));
+
+		    logger.info("Chrome browser launched successfully");
 		}else if(browser.equalsIgnoreCase("Edge")) {
 			driver.set(new EdgeDriver());
 		}else if(browser.equalsIgnoreCase("Firefox")) {
