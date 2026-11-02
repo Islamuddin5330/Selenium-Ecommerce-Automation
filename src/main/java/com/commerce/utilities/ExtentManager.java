@@ -16,7 +16,7 @@ public class ExtentManager {
      * ExtentTest             Represents an individual test
      */
 
-    private static ThreadLocal<ExtentTest> extentTest =
+	private static ThreadLocal<ExtentTest> extentTest =
             new ThreadLocal<>();
 
     private static ExtentReports extent;
@@ -25,13 +25,25 @@ public class ExtentManager {
 
         if (extent == null) {
 
-            File file = new File(
-                    System.getProperty("user.dir")
-                    + "\\src\\test\\resources\\ExtentReport\\ExtentReport.html"
-            );
+            String reportPath = System.getProperty("user.dir")
+                    + File.separator
+                    + "src"
+                    + File.separator
+                    + "test"
+                    + File.separator
+                    + "resources"
+                    + File.separator
+                    + "ExtentReport"
+                    + File.separator
+                    + "ExtentReport.html";
+
+            File reportFile = new File(reportPath);
+
+            // Create report directory if it does not exist
+            reportFile.getParentFile().mkdirs();
 
             ExtentSparkReporter spark =
-                    new ExtentSparkReporter(file);
+                    new ExtentSparkReporter(reportFile);
 
             extent = new ExtentReports();
 
@@ -42,7 +54,6 @@ public class ExtentManager {
             extent.setSystemInfo("Programming Language", "Java");
             extent.setSystemInfo("Test Framework", "TestNG");
             extent.setSystemInfo("Tester", "Automation Tester");
-
         }
 
         return extent;
@@ -55,23 +66,29 @@ public class ExtentManager {
 
         setTest(test);
     }
-    
+
     public static void setTest(ExtentTest test) {
 
         extentTest.set(test);
-
     }
 
     public static ExtentTest getTest() {
 
         return extentTest.get();
-
     }
 
     public static void unload() {
 
         extentTest.remove();
+    }
 
+    // Flush report after test execution
+    public static synchronized void flushReport() {
+
+        if (extent != null) {
+
+            extent.flush();
+        }
     }
 
 }
