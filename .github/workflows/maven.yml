@@ -1,55 +1,186 @@
 
-- name: Deploy to GitHub Pages
-  if: always() && steps.archive_report.outcome == 'success'
-  id: deployment
-  uses: actions/deploy-pages@v4
+name: Java Selenium Automation CI-CD
 
-# Send execution result to Slack
-- name: Send Slack Notification
-  if: always() && github.event_name != 'pull_request'
-  env:
-    SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-    JOB_STATUS: ${{ job.status }}
-    RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-  run: |
-    MESSAGE="Java Selenium Automation CI-CD
-    Status: ${JOB_STATUS}
-    Repository: ${GITHUB_REPOSITORY}
-    Branch: ${GITHUB_REF_NAME}
-    Run Number: ${GITHUB_RUN_NUMBER}
-    Details: ${RUN_URL}"
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
 
-    PAYLOAD=$(jq -n --arg text "$MESSAGE" '{text: $text}')
+permissions:
+  contents: write
+  pages: write
+  id-token: write
 
-    curl --fail --silent --show-error \
-      -X POST \
-      -H "Content-Type: application/json" \
-      --data "$PAYLOAD" \
-      "$SLACK_WEBHOOK_URL"
+jobs:
+  selenium-tests:
+    runs-on: ubuntu-latest
 
-# Send execution result to Gmail
-- name: Send Email Notification
-  if: always() && github.event_name != 'pull_request'
-  uses: dawidd6/action-send-mail@v3
-  with:
-    server_address: smtp.gmail.com
-    server_port: 465
-    secure: true
-    username: ${{ secrets.EMAIL_USERNAME }}
-    password: ${{ secrets.EMAIL_PASSWORD }}
-    subject: "Selenium Automation - ${{ job.status }}"
-    to: ${{ secrets.EMAIL_TO }}
-    from: "Selenium Automation <${{ secrets.EMAIL_USERNAME }}>"
-    body: |
-      Java Selenium Automation CI-CD Execution Result
+    steps:
+      # 1. Checkout Selenium project
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      Status: ${{ job.status }}
-      Repository: ${{ github.repository }}
-      Branch: ${{ github.ref_name }}
-      Commit: ${{ github.sha }}
-      Run Number: ${{ github.run_number }}
+      # 2. Set up Java 21
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
 
-      View execution details:
-      ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      # 3. Set up Chrome
+      - name: Set up Chrome
+        uses: browser-actions/setup-chrome@v1
 
-      This is an automated notification from GitHub Actions.
+      # 4. Execute Selenium TestNG suite
+      - name: Run Selenium TestNG Suite
+        run: mvn -B test -Dsurefire.suiteXmlFiles=testng.xml -Dheadless=true
+
+      # 5. Upload test reports and screenshots
+      - name: Upload test reports and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenium-test-results
+          path: |
+            target/surefire-reports/
+            test-output/
+            src/test/resources/ScreenShot/
+            src/test/resources/ExtentReport/
+          if-no-files-found: ignore
+
+      # 6. Checkout gh-pages for historical report storage
+      - name: Checkout report history branch
+        id: history_checkout
+        if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site
+
+      # 7. Archive Extent Report
+      - name: Archive Extent Report
+        id: archive_report
+        if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.history_checkout.outcome == 'success'
+        run: |
+          REPORT="src/test/resources/ExtentReport/ExtentReport.html"
+          RUN_FOLDER="run-${GITHUB_RUN_NUMBER}-attempt-${GITHUB_RUN_ATTEMPT}"
+
+          mkdir -p site/reports/history
+
+          if [ -f "$REPORT" ]; then
+            mkdir -p "site/reports/history/$RUN_FOLDER"
+            cp "$REPORT" "site/reports/history/$RUN_FOLDER/index.html"
+            cp "$REPORT" site/latest.html
+            echo "Archived report: $RUN_FOLDER"
+          else
+            echo "::warning::Extent Report was not generated."
+          fi
+
+          {
+            echo '<!DOCTYPE html>'
+            echo '<html><head><meta charset="UTF-8">'
+            echo '<title>Selenium Automation Reports</title>'
+            echo '</head><body>'
+            echo '<h1>Selenium Automation Reports</h1>'
+
+            if [ -f site/latest.html ]; then
+              echo '<h2><a href="latest.html">View Latest Extent Report</a></h2>'
+            fi
+
+            echo '<h2>Historical Test Executions</h2>'
+            echo '<ul>'
+
+            if [ -d site/reports/history ]; then
+              while IFS= read -r report; do
+                folder=$(basename "$(dirname "$report")")
+                relative_path="${report#site/}"
+                printf '<li><a href="%s">%s</a></li>\n' "$relative_path" "$folder"
+              done < <(find site/reports/history -mindepth 2 -maxdepth 2 -name index.html | sort -Vr)
+            fi
+
+            echo '</ul></body></html>'
+          } > site/index.html
+
+          touch site/.nojekyll
+
+          git -C site config user.name "github-actions[bot]"
+          git -C site config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git -C site add --all
+
+          if ! git -C site diff --cached --quiet; then
+            git -C site commit -m "Archive Selenium report ${RUN_FOLDER}"
+            git -C site push origin HEAD:gh-pages
+          fi
+
+      # 8. Configure GitHub Pages
+      - name: Configure GitHub Pages
+        if: always() && steps.archive_report.outcome == 'success'
+        uses: actions/configure-pages@v5
+
+      # 9. Upload GitHub Pages artifact
+      - name: Upload GitHub Pages artifact
+        if: always() && steps.archive_report.outcome == 'success'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      # 10. Deploy historical reports
+      - name: Deploy to GitHub Pages
+        if: always() && steps.archive_report.outcome == 'success'
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      # 11. Send Slack notification
+      - name: Send Slack Notification
+        if: always() && github.event_name != 'pull_request'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          MESSAGE="Java Selenium Automation CI-CD
+          Status: ${JOB_STATUS}
+          Repository: ${GITHUB_REPOSITORY}
+          Branch: ${GITHUB_REF_NAME}
+          Run Number: ${GITHUB_RUN_NUMBER}
+          Details: ${RUN_URL}"
+
+          PAYLOAD=$(jq -n --arg text "$MESSAGE" '{text: $text}')
+
+          curl --fail --silent --show-error \
+            -X POST \
+            -H "Content-Type: application/json" \
+            --data "$PAYLOAD" \
+            "$SLACK_WEBHOOK_URL"
+
+      # 12. Send Gmail notification
+      - name: Send Email Notification
+        if: always() && github.event_name != 'pull_request'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "Selenium Automation - ${{ job.status }}"
+          to: ${{ secrets.EMAIL_TO }}
+          from: "Selenium Automation <${{ secrets.EMAIL_USERNAME }}>"
+          body: |
+            Java Selenium Automation CI-CD Execution Result
+
+            Status: ${{ job.status }}
+
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Run Number: ${{ github.run_number }}
+
+            View execution details:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            This is an automated notification from GitHub Actions.
