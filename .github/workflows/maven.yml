@@ -4,14 +4,12 @@ name: Java Selenium Automation CI-CD
 on:
   push:
     branches: ["main"]
-
   pull_request:
     branches: ["main"]
-
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -48,24 +46,81 @@ jobs:
             src/test/resources/ExtentReport/
           if-no-files-found: ignore
 
-      # Prepare Extent Report for GitHub Pages
-      - name: Prepare Extent Report
-        run: |
-          mkdir -p site
-          test -f src/test/resources/ExtentReport/ExtentReport.html
-          cp src/test/resources/ExtentReport/ExtentReport.html site/index.html
+      # Checkout gh-pages to use it as historical report storage
+      - name: Checkout report history branch
+        id: history_checkout
+        if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site
 
-      # Configure GitHub Pages
+      # Save this execution and regenerate the report history page
+      - name: Archive Extent Report
+        id: archive_report
+        if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.history_checkout.outcome == 'success'
+        run: |
+          REPORT="src/test/resources/ExtentReport/ExtentReport.html"
+          RUN_FOLDER="run-${GITHUB_RUN_NUMBER}-attempt-${GITHUB_RUN_ATTEMPT}"
+
+          mkdir -p "site/reports/history"
+
+          if [ -f "$REPORT" ]; then
+            mkdir -p "site/reports/history/$RUN_FOLDER"
+            cp "$REPORT" "site/reports/history/$RUN_FOLDER/index.html"
+            cp "$REPORT" "site/latest.html"
+            echo "Archived report: $RUN_FOLDER"
+          else
+            echo "::warning::Extent Report was not generated."
+          fi
+
+          {
+            echo '<!DOCTYPE html>'
+            echo '<html><head><meta charset="UTF-8">'
+            echo '<title>Selenium Automation Reports</title>'
+            echo '</head><body>'
+            echo '<h1>Selenium Automation Reports</h1>'
+
+            if [ -f site/latest.html ]; then
+              echo '<h2><a href="latest.html">View Latest Extent Report</a></h2>'
+            fi
+
+            echo '<h2>Historical Test Executions</h2>'
+            echo '<ul>'
+
+            if [ -d site/reports/history ]; then
+              while IFS= read -r report; do
+                folder=$(basename "$(dirname "$report")")
+                relative_path="${report#site/}"
+                printf '<li><a href="%s">%s</a></li>\n' "$relative_path" "$folder"
+              done < <(find site/reports/history -mindepth 2 -maxdepth 2 -name index.html | sort -Vr)
+            fi
+
+            echo '</ul></body></html>'
+          } > site/index.html
+
+          touch site/.nojekyll
+
+          git -C site config user.name "github-actions[bot]"
+          git -C site config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C site add --all
+
+          if ! git -C site diff --cached --quiet; then
+            git -C site commit -m "Archive Selenium report ${RUN_FOLDER}"
+            git -C site push origin HEAD:gh-pages
+          fi
+
       - name: Configure GitHub Pages
+        if: always() && steps.archive_report.outcome == 'success'
         uses: actions/configure-pages@v5
 
-      # Upload report for deployment
       - name: Upload GitHub Pages artifact
+        if: always() && steps.archive_report.outcome == 'success'
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
 
-      # Deploy report
       - name: Deploy to GitHub Pages
+        if: always() && steps.archive_report.outcome == 'success'
         id: deployment
         uses: actions/deploy-pages@v4
