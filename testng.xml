@@ -10,7 +10,6 @@
 
     <test name="E-CommerceTests">
         <classes>
-            <class name="EcommerceTestCases.endToEndTestCase"/>
             <class name="EcommerceTestCases.endToEndTestCaseExceldata"/>
         </classes>
     </test>
