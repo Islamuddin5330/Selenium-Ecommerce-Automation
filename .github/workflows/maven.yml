@@ -124,3 +124,56 @@ jobs:
         if: always() && steps.archive_report.outcome == 'success'
         id: deployment
         uses: actions/deploy-pages@v4
+		
+		
+		# Send execution result to Slack
+		- name: Send Slack Notification
+		  if: always()
+		  env:
+		    SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+		    JOB_STATUS: ${{ job.status }}
+		    RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+		  run: |
+		    MESSAGE="Java Selenium Automation CI-CD
+		    Status: ${JOB_STATUS}
+		    Repository: ${GITHUB_REPOSITORY}
+		    Branch: ${GITHUB_REF_NAME}
+		    Run Number: ${GITHUB_RUN_NUMBER}
+		    Details: ${RUN_URL}"
+
+		    PAYLOAD=$(jq -n --arg text "$MESSAGE" '{text: $text}')
+
+		    curl --fail --silent --show-error \
+		      -X POST \
+		      -H "Content-Type: application/json" \
+		      --data "$PAYLOAD" \
+		      "$SLACK_WEBHOOK_URL"
+			  
+			  
+			  # Send execution result to Gmail
+			  - name: Send Email Notification
+			    if: always()
+			    uses: dawidd6/action-send-mail@v3
+			    with:
+			      server_address: smtp.gmail.com
+			      server_port: 465
+			      secure: true
+			      username: ${{ secrets.EMAIL_USERNAME }}
+			      password: ${{ secrets.EMAIL_PASSWORD }}
+			      subject: "Selenium Automation - ${{ job.status }}"
+			      to: ${{ secrets.EMAIL_TO }}
+			      from: "Selenium Automation <${{ secrets.EMAIL_USERNAME }}>"
+			      body: |
+			        Java Selenium Automation CI-CD Execution Result
+
+			        Status: ${{ job.status }}
+
+			        Repository: ${{ github.repository }}
+			        Branch: ${{ github.ref_name }}
+			        Commit: ${{ github.sha }}
+			        Run Number: ${{ github.run_number }}
+
+			        View execution details:
+			        ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+			        This is an automated notification from GitHub Actions.
