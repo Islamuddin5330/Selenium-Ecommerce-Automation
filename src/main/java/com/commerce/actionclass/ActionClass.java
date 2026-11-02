@@ -3,14 +3,53 @@ package com.commerce.actionclass;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.time.Duration;
 import java.util.UUID;
 
+import org.openqa.selenium.By;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.ui.WebDriverWait;
 
 public class ActionClass {
 
+	public WebDriver driver;
+	//for elemtn
+	public void click(WebElement element) {
+		element.click();
+	}
+	//for locator
+	public void click1(By locator) {
+		WebElement ele = driver.findElement(locator);
+		ele.click();
+	}
+	
+	public void send(WebElement element) {
+		element.click();
+	}
+	//By locator
+	public void sendText(By locator) {
+		WebElement ele  = driver.findElement(locator);
+		ele.click();
+	}
+	
+	public void waitElem(By locator) {
+		WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
+		
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 
 public static String captureScreenshot(WebDriver driver, String testName) {
 

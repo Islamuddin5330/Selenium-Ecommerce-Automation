@@ -1,5 +1,5 @@
 
-name: Java Selenium Automation CI
+name: Java Selenium Automation CI-CD
 
 on:
   push:
@@ -9,6 +9,11 @@ on:
     branches: ["main"]
 
   workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
   selenium-tests:
@@ -40,4 +45,27 @@ jobs:
             target/surefire-reports/
             test-output/
             src/test/resources/ScreenShot/
+            src/test/resources/ExtentReport/
           if-no-files-found: ignore
+
+      # Prepare Extent Report for GitHub Pages
+      - name: Prepare Extent Report
+        run: |
+          mkdir -p site
+          test -f src/test/resources/ExtentReport/ExtentReport.html
+          cp src/test/resources/ExtentReport/ExtentReport.html site/index.html
+
+      # Configure GitHub Pages
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      # Upload report for deployment
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      # Deploy report
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
