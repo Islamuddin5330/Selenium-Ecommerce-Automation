@@ -29,6 +29,11 @@ public class LoginPage {
 	@FindBy(id = "loginBtn")
 	private WebElement loginButton;
 	
+	//Abstraction — hiding implementation details
+	//loginPage.login(username, password);
+	//The test does not need to know how the username is entered, how the password field is located, or how the login button is clicked.
+	//Those implementation details are hidden inside the page class.
+	//This is abstraction through a well-designed Page Object.
 	
 	public GenderPage login(String userName, String passWord) {
 		enterEmail.sendKeys(userName);

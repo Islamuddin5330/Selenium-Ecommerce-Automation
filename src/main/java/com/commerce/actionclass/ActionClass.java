@@ -17,11 +17,13 @@ public class ActionClass {
 
 	public WebDriver driver;
 	//for elemtn
+	//Polymorphism — one method, different behavior
+	//This is method overloading.
 	public void click(WebElement element) {
 		element.click();
 	}
 	//for locator
-	public void click1(By locator) {
+	public void click(By locator) {
 		WebElement ele = driver.findElement(locator);
 		ele.click();
 	}
