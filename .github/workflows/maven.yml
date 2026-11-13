@@ -2,6 +2,8 @@
 name: Java Selenium Automation CI-CD
 
 on:
+  schedule:
+    - cron: '30 2 * * *'  # Every day at 8:00 AM IST
   push:
     branches: ["main"]
   pull_request:
