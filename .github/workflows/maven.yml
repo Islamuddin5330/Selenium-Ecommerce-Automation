@@ -159,6 +159,7 @@ jobs:
             --data "$PAYLOAD" \
             "$SLACK_WEBHOOK_URL"
 
+      
       # 12. Send Gmail notification
       - name: Send Email Notification
         if: always() && github.event_name != 'pull_request'
@@ -167,22 +168,36 @@ jobs:
           server_address: smtp.gmail.com
           server_port: 465
           secure: true
+
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
+
           subject: "Selenium Automation - ${{ job.status }}"
+
           to: ${{ secrets.EMAIL_TO }}
           from: "Selenium Automation <${{ secrets.EMAIL_USERNAME }}>"
+
           body: |
+            Hello,
+
             Java Selenium Automation CI-CD Execution Result
 
-            Status: ${{ job.status }}
-
+            ------------------------------------
+            Execution Status: ${{ job.status }}
             Repository: ${{ github.repository }}
             Branch: ${{ github.ref_name }}
             Commit: ${{ github.sha }}
             Run Number: ${{ github.run_number }}
+            ------------------------------------
 
-            View execution details:
+            Latest Extent Report:
+            https://islamuddin5330.github.io/Selenium-Ecommerce-Automation/latest.html
+
+            GitHub Actions Execution Details:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-            This is an automated notification from GitHub Actions.
+            You can download screenshots and other test artifacts
+            from the GitHub Actions execution page.
+
+            Regards,
+            Selenium Automation Framework
